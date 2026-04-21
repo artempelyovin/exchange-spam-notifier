@@ -4,4 +4,41 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "exchangelib>=5.6.0",
+    "python-telegram-bot>=22.7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.11",
+    "ty>=0.0.32",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+fix = true
+
+[tool.ruff.lint]
+fixable = ["I"]  # fix only `isort`
+select = ["ALL"]
+ignore = [
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D105", # Missing docstring in magic method
+    "D107", # Missing docstring in `__init__`
+    "D203", # One blank line before class (ignored by D211)
+    "D212", # Multi line summary first line (ignored by D213)
+    "COM812", # Missing trailing comma (skip it because it conflicts with `ruff format`)
+    "ISC001", # single-line-implicit-string-concatenation (skip it because it conflicts with `ruff format`)
+    "TD002", # Missing T O D O author
+    "TD003", # Missing T O D O link
+    "RUF001",  # ambiguous-unicode-character-string (skip it because many false positives)
+    "RUF002",  # ambiguous-unicode-character-docstring (skip it because many false positives)
+    "RUF003",  # ambiguous-unicode-character-comment (skip it because many false positives)
+    "ANN",  # flake8-annotations (skip it because using another type checker`)
+]
