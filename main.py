@@ -21,6 +21,7 @@ EVENTS_DIR = os.getenv("EVENTS_DIR", "/tmp/exchange-events")
 CHECK_INTERVAL = 5  # секунды между проверками календаря
 SPAM_INTERVAL = 2  # секунды между спам-сообщениями
 GRACE_MINUTES = 2  # считать событие "начавшимся", если оно началось не раньше N минут назад
+CLEAN_INTERVAL = 60  # секунды между очистками файлов завершившихся событий
 # ===================================================
 
 logging.basicConfig(
@@ -170,13 +171,43 @@ async def spam_loop():
                 await _send_spam(ev)
 
 
-async def main():
-    Path(EVENTS_DIR).mkdir(parents=True, exist_ok=True)
+# ==================== CLEANER ====================
 
+
+async def cleaner_loop():
+    """Фоновая очистка JSON-файлов событий, которые уже завершились."""
+    while True:
+        await asyncio.sleep(CLEAN_INTERVAL)
+        now = datetime.now(tz=TIMEZONE)
+        dir_path = Path(EVENTS_DIR)
+        for path in dir_path.glob("*.json"):
+            try:
+                content = json.loads(path.read_text(encoding="utf-8"))
+                end = datetime.fromisoformat(content["end"])
+                if end < now:
+                    path.unlink()
+                    logger.info(f"Удалён файл завершённого события: {path.absolute()}")
+            except Exception:
+                logger.exception(f"Ошибка при очистке {path.absolute()}:")
+
+
+# ==================== MAIN ====================
+
+
+async def main():
     logger.info("Exchange Spam Notifier запущен")
+
+    dir_path = Path(EVENTS_DIR)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    for path in dir_path.iterdir():
+        if path.is_file() and path.suffix == ".json":
+            path.unlink()
+            logger.info(f"Удалён старый файл события: {path.absolute()}")
+
     await asyncio.gather(
         calendar_poller(),
         spam_loop(),
+        cleaner_loop(),
     )
 
 
