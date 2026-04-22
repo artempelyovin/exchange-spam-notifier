@@ -52,9 +52,6 @@ class Event:
 lock = asyncio.Lock()
 
 
-# ==================== EXCHANGE ====================
-
-
 def fetch_started_events() -> list[Event]:
     """
     Синхронная функция. Спрашивает Exchange о событиях,
@@ -66,7 +63,6 @@ def fetch_started_events() -> list[Event]:
 
     found = []
     try:
-        # view() сам разворачивает повторяющиеся (recurring) события
         for item in account.calendar.view(start=window_start, end=window_end):
             item_start = item.start.astimezone(TIMEZONE)
             item_end = item.end.astimezone(TIMEZONE)
@@ -109,13 +105,15 @@ def get_all_events() -> list[Event]:
             except json.JSONDecodeError:
                 logger.exception(f"Не удалось прочитать {path.absolute()}:")
                 continue
-            events.append(Event(
-                uid=content["uid"],
-                subject=content["subject"],
-                start=datetime.fromisoformat(content["start"]),
-                end=datetime.fromisoformat(content["end"]),
-                disable=content["disable"],
-            ))
+            events.append(
+                Event(
+                    uid=content["uid"],
+                    subject=content["subject"],
+                    start=datetime.fromisoformat(content["start"]),
+                    end=datetime.fromisoformat(content["end"]),
+                    disable=content["disable"],
+                )
+            )
     return events
 
 
@@ -136,9 +134,6 @@ async def calendar_poller():
             logger.exception(f"Ошибка в calendar_poller:")
 
         await asyncio.sleep(CHECK_INTERVAL)
-
-
-# ==================== SPAM ====================
 
 
 async def _send_spam(event: Event):
@@ -171,9 +166,6 @@ async def spam_loop():
                 await _send_spam(ev)
 
 
-# ==================== CLEANER ====================
-
-
 async def cleaner_loop():
     """Фоновая очистка JSON-файлов событий, которые уже завершились."""
     while True:
@@ -189,9 +181,6 @@ async def cleaner_loop():
                     logger.info(f"Удалён файл завершённого события: {path.absolute()}")
             except Exception:
                 logger.exception(f"Ошибка при очистке {path.absolute()}:")
-
-
-# ==================== MAIN ====================
 
 
 async def main():
