@@ -17,7 +17,7 @@ EXCHANGE_SERVER = os.getenv("EXCHANGE_SERVER")
 
 TIMEZONE = ZoneInfo("Europe/Moscow")
 
-EVENTS_DIR = os.getenv("EVENTS_DIR", "/tmp/exchange-events")
+EVENTS_DIR = os.getenv("EVENTS_DIR", "/tmp/exchange-events")  # noqa: S108
 CHECK_INTERVAL = 5  # секунды между проверками календаря
 SPAM_INTERVAL = 2  # секунды между спам-сообщениями
 GRACE_MINUTES = 2  # считать событие "начавшимся", если оно началось не раньше N минут назад
@@ -53,10 +53,7 @@ lock = asyncio.Lock()
 
 
 def fetch_started_events() -> list[Event]:
-    """
-    Синхронная функция. Спрашивает Exchange о событиях,
-    которые начались недавно и ещё идут.
-    """
+    """Получение событий напрямую из Exchange."""
     now = datetime.now(tz=TIMEZONE)
     window_start = now - timedelta(minutes=GRACE_MINUTES)
     window_end = now + timedelta(minutes=1)
@@ -77,8 +74,8 @@ def fetch_started_events() -> list[Event]:
                         end=datetime.fromisoformat(item_end.isoformat()),
                     )
                 )
-    except Exception as e:
-        logger.error(f"Ошибка при запросе к Exchange: {e}")
+    except Exception:
+        logger.exception("Ошибка при запросе к Exchange:")
 
     return found
 
@@ -92,7 +89,7 @@ def save_event(ev: Event) -> None:
     content = json.dumps(asdict(ev), default=encode, indent=4)
     path = Path(f"{EVENTS_DIR}/{ev.uid}.json")
     path.write_text(content, encoding="utf-8")
-    logger.info(f"Создан новый файл события: {path.absolute()}")
+    logger.info("Создан новый файл события: %s", path.absolute())
 
 
 def get_all_events() -> list[Event]:
@@ -103,7 +100,7 @@ def get_all_events() -> list[Event]:
             try:
                 content = json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
-                logger.exception(f"Не удалось прочитать {path.absolute()}:")
+                logger.exception("Не удалось прочитать %:", path.absolute())
                 continue
             events.append(
                 Event(
@@ -118,7 +115,7 @@ def get_all_events() -> list[Event]:
 
 
 async def calendar_poller():
-    """Бесконечно проверяет календарь и добавляет новые события в {EVENTS_DIR}/{event.uid}.json"""
+    """Бесконечно проверяет календарь и добавляет новые события в {EVENTS_DIR}/{event.uid}.json."""
     while True:
         try:
             actual_events = await asyncio.to_thread(fetch_started_events)
@@ -127,11 +124,11 @@ async def calendar_poller():
             for ev in unknown_events:
                 save_event(ev)
                 logger.info(
-                    f"Началось событие: {ev.subject} ({ev.start.strftime('%H:%M')} - {ev.end.strftime('%H:%M')})"
+                    "Началось событие: % (% - %)", ev.subject, ev.start.strftime("%H:%M"), ev.end.strftime("%H:%M")
                 )
                 await _send_spam(ev)  # уведомляем сразу, не ждём SPAM_INTERVAL
         except Exception:
-            logger.exception(f"Ошибка в calendar_poller:")
+            logger.exception("Ошибка в calendar_poller:")
 
         await asyncio.sleep(CHECK_INTERVAL)
 
@@ -172,26 +169,26 @@ async def cleaner_loop():
         await asyncio.sleep(CLEAN_INTERVAL)
         now = datetime.now(tz=TIMEZONE)
         dir_path = Path(EVENTS_DIR)
-        for path in dir_path.glob("*.json"):
+        for path in dir_path.glob("*.json"):  # noqa: ASYNC240
             try:
                 content = json.loads(path.read_text(encoding="utf-8"))
                 end = datetime.fromisoformat(content["end"])
                 if end < now:
                     path.unlink()
-                    logger.info(f"Удалён файл завершённого события: {path.absolute()}")
+                    logger.info("Удалён файл завершённого события: %", path.absolute())
             except Exception:
-                logger.exception(f"Ошибка при очистке {path.absolute()}:")
+                logger.exception("Ошибка при очистке %:", path.absolute())
 
 
 async def main():
     logger.info("Exchange Spam Notifier запущен")
 
     dir_path = Path(EVENTS_DIR)
-    dir_path.mkdir(parents=True, exist_ok=True)
-    for path in dir_path.iterdir():
+    dir_path.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
+    for path in dir_path.iterdir():  # noqa: ASYNC240
         if path.is_file() and path.suffix == ".json":
             path.unlink()
-            logger.info(f"Удалён старый файл события: {path.absolute()}")
+            logger.info("Удалён старый файл события: %", path.absolute())
 
     await asyncio.gather(
         calendar_poller(),
