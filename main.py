@@ -18,8 +18,8 @@ EXCHANGE_SERVER = os.getenv("EXCHANGE_SERVER")
 TIMEZONE = ZoneInfo("Europe/Moscow")
 
 EVENTS_DIR = os.getenv("EVENTS_DIR", "/tmp/exchange-events")  # noqa: S108
-CHECK_INTERVAL = 5  # секунды между проверками календаря
-SPAM_INTERVAL = 2  # секунды между спам-сообщениями
+CHECK_INTERVAL = 30  # секунды между проверками календаря
+SPAM_INTERVAL = 5  # секунды между спам-сообщениями
 GRACE_MINUTES = 2  # считать событие "начавшимся", если оно началось не раньше N минут назад
 CLEAN_INTERVAL = 60  # секунды между очистками файлов завершившихся событий
 # ===================================================
