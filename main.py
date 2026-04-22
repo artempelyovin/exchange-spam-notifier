@@ -100,7 +100,7 @@ def get_all_events() -> list[Event]:
             try:
                 content = json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
-                logger.exception("Не удалось прочитать %:", path.absolute())
+                logger.exception("Не удалось прочитать %s:", path.absolute())
                 continue
             events.append(
                 Event(
@@ -124,7 +124,7 @@ async def calendar_poller():
             for ev in unknown_events:
                 save_event(ev)
                 logger.info(
-                    "Началось событие: % (% - %)", ev.subject, ev.start.strftime("%H:%M"), ev.end.strftime("%H:%M")
+                    "Началось событие: %s (%s - %s)", ev.subject, ev.start.strftime("%H:%M"), ev.end.strftime("%H:%M")
                 )
                 await _send_spam(ev)  # уведомляем сразу, не ждём SPAM_INTERVAL
         except Exception:
@@ -175,9 +175,9 @@ async def cleaner_loop():
                 end = datetime.fromisoformat(content["end"])
                 if end < now:
                     path.unlink()
-                    logger.info("Удалён файл завершённого события: %", path.absolute())
+                    logger.info("Удалён файл завершённого события: %s", path.absolute())
             except Exception:
-                logger.exception("Ошибка при очистке %:", path.absolute())
+                logger.exception("Ошибка при очистке %s:", path.absolute())
 
 
 async def main():
@@ -188,7 +188,7 @@ async def main():
     for path in dir_path.iterdir():  # noqa: ASYNC240
         if path.is_file() and path.suffix == ".json":
             path.unlink()
-            logger.info("Удалён старый файл события: %", path.absolute())
+            logger.info("Удалён старый файл события: %s", path.absolute())
 
     await asyncio.gather(
         calendar_poller(),
