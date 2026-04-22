@@ -119,10 +119,12 @@ async def calendar_poller():
     while True:
         try:
             actual_events = await asyncio.to_thread(fetch_started_events)
-            know_uids = {ev.uid for ev in await asyncio.to_thread(get_all_events)}
+            async with lock:
+                know_uids = {ev.uid for ev in await asyncio.to_thread(get_all_events)}
             unknown_events = [ev for ev in actual_events if ev.uid not in know_uids]
             for ev in unknown_events:
-                save_event(ev)
+                async with lock:
+                    await asyncio.to_thread(save_event, ev)
                 logger.info(
                     "Началось событие: %s (%s - %s)", ev.subject, ev.start.strftime("%H:%M"), ev.end.strftime("%H:%M")
                 )
@@ -135,20 +137,21 @@ async def calendar_poller():
 
 async def _send_spam(event: Event):
     """Отправляет одно спам-сообщение."""
-    path = Path(EVENTS_DIR) / f"{event.uid}.json"
-    tmp_path = Path(EVENTS_DIR) / f"{event.uid}.tmp"
-    process = await asyncio.create_subprocess_exec(
-        "terminal-notifier",
-        "-title",
-        event.subject,
-        "-message",
-        f"⏰ {event.start.strftime('%H:%M')} — {event.end.strftime('%H:%M')}",
-        "-sound",
-        "glass",
-        "-execute",
-        f"jq '.disable = true' {path} > {tmp_path} && mv {tmp_path} {path}",
-    )
-    await process.wait()
+    async with lock:
+        path = Path(EVENTS_DIR) / f"{event.uid}.json"
+        tmp_path = Path(EVENTS_DIR) / f"{event.uid}.tmp"
+        process = await asyncio.create_subprocess_exec(
+            "terminal-notifier",
+            "-title",
+            event.subject,
+            "-message",
+            f"⏰ {event.start.strftime('%H:%M')} — {event.end.strftime('%H:%M')}",
+            "-sound",
+            "glass",
+            "-execute",
+            f"jq '.disable = true' {path} > {tmp_path} && mv {tmp_path} {path}",
+        )
+        await process.wait()
 
 
 async def spam_loop():
@@ -156,7 +159,8 @@ async def spam_loop():
     while True:
         await asyncio.sleep(SPAM_INTERVAL)
 
-        know_events = await asyncio.to_thread(get_all_events)
+        async with lock:
+            know_events = await asyncio.to_thread(get_all_events)
 
         for ev in know_events:
             if not ev.disable:
@@ -168,27 +172,29 @@ async def cleaner_loop():
     while True:
         await asyncio.sleep(CLEAN_INTERVAL)
         now = datetime.now(tz=TIMEZONE)
-        dir_path = Path(EVENTS_DIR)
-        for path in dir_path.glob("*.json"):  # noqa: ASYNC240
-            try:
-                content = json.loads(path.read_text(encoding="utf-8"))
-                end = datetime.fromisoformat(content["end"])
-                if end < now:
-                    path.unlink()
-                    logger.info("Удалён файл завершённого события: %s", path.absolute())
-            except Exception:
-                logger.exception("Ошибка при очистке %s:", path.absolute())
+        async with lock:
+            dir_path = Path(EVENTS_DIR)
+            for path in dir_path.glob("*.json"):  # noqa: ASYNC240
+                try:
+                    content = json.loads(path.read_text(encoding="utf-8"))
+                    end = datetime.fromisoformat(content["end"])
+                    if end < now:
+                        path.unlink()
+                        logger.info("Удалён файл завершённого события: %s", path.absolute())
+                except Exception:
+                    logger.exception("Ошибка при очистке %s:", path.absolute())
 
 
 async def main():
     logger.info("Exchange Spam Notifier запущен")
 
-    dir_path = Path(EVENTS_DIR)
-    dir_path.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
-    for path in dir_path.iterdir():  # noqa: ASYNC240
-        if path.is_file() and path.suffix == ".json":
-            path.unlink()
-            logger.info("Удалён старый файл события: %s", path.absolute())
+    async with lock:
+        dir_path = Path(EVENTS_DIR)
+        dir_path.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
+        for path in dir_path.iterdir():  # noqa: ASYNC240
+            if path.is_file() and path.suffix == ".json":
+                path.unlink()
+                logger.info("Удалён старый файл события: %s", path.absolute())
 
     await asyncio.gather(
         calendar_poller(),
