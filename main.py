@@ -119,7 +119,7 @@ async def calendar_poller():
     while True:
         try:
             actual_events = await asyncio.to_thread(fetch_started_events)
-            know_uids = {ev.uid for ev in get_all_events()}
+            know_uids = {ev.uid for ev in await asyncio.to_thread(get_all_events)}
             unknown_events = [ev for ev in actual_events if ev.uid not in know_uids]
             for ev in unknown_events:
                 save_event(ev)
